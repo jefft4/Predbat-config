@@ -1,0 +1,269 @@
+## ------------------------------------------------------------------
+# Predbat config for ha.boolie
+#
+# JT Sep 2024
+# 07/10/24 - remove battery curve, let it go auto;
+#          - battery cycle cost up to curb silly little discharges;
+#    01/25 - days previous to balance 1,7,14
+#    03/25 - add car ; implement the two freeze services per Trefor's description
+#
+# ------------------------------------------------------------------
+
+##
+##  This is the default SX4 config, pretty much.
+##
+
+---
+pred_bat:
+  module: predbat
+  class: PredBat
+
+  # Sets the prefix for all created entities in HA - only change if you want to run more than once instance
+  prefix: predbat
+
+#  # XXX: This is a configuration template, delete this line once you edit your configuration
+#  template: True
+
+  # Timezone to work in
+  timezone: Europe/London
+
+  # Currency, symbol for main currency second symbol for 1/100s e.g. $ c or £ p or e c
+  currency_symbols:
+   - '£'
+   - 'p'
+
+  # Number of threads to use in plan calculation
+  # Can be auto for automatic, 0 for off or values 1-N for a fixed number
+  threads: auto
+
+  # If you are using Predbat outside of HA then set the HA URL and Key (long lived access token here)
+  ha_url: "http://192.168.8.200:8123"
+  # admin ha_key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkY2NlNGU2Y2VmMDU0MGEzOGMxODNjNDA0NjM5OTQ2ZSIsImlhdCI6MTcyNjMyODMwOCwiZXhwIjoyMDQxNjg4MzA4fQ.hP6fBtLD9-LjsDoXZfftX9sLqt3kG9Dk1EGy6fcpW5A'
+  # predbat as predbat user
+  ha_key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiI5MGY1NjI3MTlmOGY0MDhlOWZlOTY0OTVlZDBkNGUxNyIsImlhdCI6MTc0MzM1Mjg2OCwiZXhwIjoyMDU4NzEyODY4fQ.aefA7MhzlQZOAesyQBKUIYefrQx3CCWg0kC1z8oOtJE"
+
+  ## Need expert mode enabled to configure battery cycle cost and self-sufficiency bias, which are then set through the UI
+  expert_mode: True
+
+  # Inverter
+  # JT - combined our two as one using some template sensors; trying to have two was tricky and we can't ignore the non-battery one else predbat doesn't see the true load
+  inverter_type: "SX4"
+  num_inverters: 1
+  output_charge_control: "power"
+
+  solax_modbus_new: true
+
+  #
+  # Controls/status - 1 per inverter
+  #
+
+  # Max inverter power from battery
+  battery_rate_max:
+  # per Solax docs for the T58
+    - 4000
+  soc_max:
+  # Battery capacity in kWh
+    - 5.8
+  load_today:
+    - sensor.house_power_consumed_today
+  import_today:
+    - sensor.solax_today_s_import_energy
+  export_today:
+    - sensor.solax_today_s_export_energy
+  pv_today:
+    - sensor.solar_yield_today
+  battery_voltage:
+    - sensor.solax_battery_voltage_charge
+  inverter_time:
+  ##JT shouldn't need this if using direct control rather than setting time periods, but it errors without it
+    - sensor.solax_rtc
+  battery_power:
+    - sensor.solax_battery_power_charge
+  pv_power:
+    - sensor.solax_pv_power_total
+  load_power:
+    - sensor.solar_ac_power
+  soc_percent:
+    - sensor.solax_battery_capacity
+  reserve:
+    - number.solax_backup_discharge_min_soc
+  battery_min_soc:
+    - number.solax_feedin_discharge_min_soc
+
+  charge_discharge_update_button:
+    - button.solax_remotecontrol_trigger
+
+  energy_control_switch:
+    - select.solaxmodbus_remotecontrol_power_control
+
+  ## JT - this appears to have no 'demand' (self-use) mode - ?!  Check the code, see what it's doing.
+  # Service for start/stop
+  charge_start_service:
+    service: select.select_option
+    entity_id: select.solax_manual_mode_select
+    option: "Force Charge"
+  charge_stop_service:
+    service: select.select_option
+    entity_id: select.solax_manual_mode_select
+    option: "Stop Charge and Discharge"
+  discharge_start_service:
+    service: select.select_option
+    entity_id: select.solax_manual_mode_select
+    option: "Force Discharge"
+
+  # Inverter max AC limit (one per inverter)
+  # If you have a second inverter for PV only please add the two values together
+  inverter_limit:
+  ## JT - 5k + 2k
+    - 7000
+
+  # Export limit is a software limit set on your inverter that prevents exporting above a given level
+  # When enabled Predbat will model this limit
+  #JT - no limit set in our inverter
+  #export_limit:
+  #  - 7200
+
+  # Some inverters don't turn off when the rate is set to 0, still charge or discharge at around 200w
+  # The value can be set here in watts to model this (doesn't change operation)
+#  inverter_battery_rate_min:
+#    - 100
+
+  ## JT - this is a rough observation; need to put it into forced charge and watch to get a better curve
+  ## this may taper much earlier - at 92%, I'm seeing 2.7kW which is ~55%!
+  ## It's supposed to calculate this from historical data, so let's leave it out and see how it fares!
+  # battery_charge_power_curve:
+  #  95 : 0.80
+  #  96 : 0.60
+  #  97 : 0.40
+  #  98 : 0.30
+  #  99 : 0.20
+  #  100 : 0.10
+
+  # Battery min SoC
+  set_reserve_min: 10
+
+  # Inverter efficiency
+  ## JT 5% vs default 4%, battery figures are default 3%
+  battery_loss: 0.03
+  battery_loss_discharge: 0.03
+  inverter_loss: 0.05
+
+  # Octoplus saving sessions & free energy events - predbat will decide whether to charge and dump
+  octopus_saving_session: binary_sensor.octopus_energy_a_39001cba_octoplus_saving_sessions
+  octopus_free_session: 're:(event.octopus_energy_([0-9a-z_]+|)_octoplus_free_electricity_session_events)'
+
+  # Energy rates
+
+  # Set import and export entity to point to the Octopus Energy plugin
+  # automatically matches your meter number assuming you have only one
+  # Or manually set it to the correct sensor names e.g:
+  # sensor.octopus_energy_electricity_xxxxxxxxxx_xxxxxxxxxxxxx_current_rate
+  # sensor.octopus_energy_electricity_xxxxxxxxxx_xxxxxxxxxxxxx_export_current_rate
+  metric_octopus_import: 're:(sensor.(octopus_energy_|)electricity_[0-9a-z]+_[0-9a-z]+_current_rate)'
+  metric_octopus_export: 're:(sensor.(octopus_energy_|)electricity_[0-9a-z]+_[0-9a-z]+_export_current_rate)'
+
+  # Standing charge can be set to a sensor (e.g. Octopus) or manually entered in pounds here (e.g. 0.50 is 50p)
+  metric_standing_charge: 're:(sensor.(octopus_energy_|)electricity_[0-9a-z]+_[0-9a-z]+_current_standing_charge)'
+
+  # For pv estimate, leave blank for central estimate, or add 10 for 10% curve (worst case) or 90 or 90% curve (best case)
+  # If you use 10 then disable pv_metric10_weight below
+  # pv_estimate: 10
+
+  # Days previous is the number of days back to find historical load data
+  # Recommended is 7 to capture day of the week but 1 can also be used
+  # if you have more history you could use 7 and 14 (in a list) but the standard data in HA only lasts 10 days
+  days_previous:
+    - 1
+    - 7
+
+  # Days previous weight can be used to control the weighting of the previous load points, the values are multiplied by their
+  # weights and then divided through by the total weight. E.g. if you used 1 and 0.5 then the first value would have 2/3rd of the weight and the second 1/3rd
+  ## JT - bias to same day last week, with a smattering of earlier weeks and the last 2 days
+  days_previous_weight:
+    - 1
+    - 2
+
+  # Number of hours forward to forecast, best left as-is unless you have specific reason (default is 48)
+  forecast_hours: 48
+
+  # The number of hours ahead to count in charge planning (for cost estimates)
+  # It's best to set this on your charge window repeat cycle (24) but you may want to set it higher for more variable
+  # tariffs like Agile
+  ## JT - Agile. 36 hrs is about the most we can ever see rates for and covers overnight into the next day
+  forecast_plan_hours: 36
+
+  ## How often to reevaulate the plan
+  calculate_plan_every: 10
+
+  # Specify the devices that notifies are sent to, the default is 'notify' which goes to all
+  #notify_devices:
+  #  - mobile_app_treforsiphone12_2
+
+  # Set the frequency in minutes that this plugin is run
+  # recommend something that divides by 60 (5, 10 or 15) or you won't trigger at the start of energy price slots
+  ## JT - default 5, I think 10 is often enough. Not sure this does anything as we're running predbat in a docker not through the HA plugin
+  run_every: 10
+
+  # Solcast cloud interface, set this or the local interface below
+  #solcast_host: 'https://api.solcast.com.au/'
+  #solcast_api_key: '7F6SvLJMOIinITEfqHFdG7eqC0PcIrsJ'
+  #solcast_poll_hours: 8
+
+  # Set these to match solcast sensor names if not using the cloud interface
+  # The regular expression (re:) makes the solcast bit optional
+  # If these don't match find your own names in Home Assistant
+  pv_forecast_today: re:(sensor.(solcast_|)(pv_forecast_|)forecast_today)
+  pv_forecast_tomorrow: re:(sensor.(solcast_|)(pv_forecast_|)forecast_tomorrow)
+  pv_forecast_d3: re:(sensor.(solcast_|)(pv_forecast_|)forecast_(day_3|d3))
+  pv_forecast_d4: re:(sensor.(solcast_|)(pv_forecast_|)forecast_(day_4|d4))
+
+  # Battery scaling makes the battery smaller (e.g. 0.9) or bigger than its reported
+  # If you have an 80% DoD battery that falsely reports it's kwh then set it to 0.8 to report the real figures
+  battery_scaling: 1.0
+
+  # Can be used to scale import and export data, used for workarounds
+  import_export_scaling: 1.0
+
+  # Inverter clock skew in minutes, e.g. 1 means it's 1 minute fast and -1 is 1 minute slow
+  # Separate start and end options are applied to the start and end time windows, mostly as you want to start late (not early) and finish early (not late)
+  # Separate discharge skew for discharge windows only
+  inverter_clock_skew_start: 0
+  inverter_clock_skew_end: 0
+  inverter_clock_skew_discharge_start: 0
+  inverter_clock_skew_discharge_end: 0
+
+  # Clock skew adjusts the Appdaemon time
+  # This is the time that Predbat takes actions like starting discharge/charging
+  # Only use this for workarounds if your inverter time is correct but Predbat is somehow wrong (AppDaemon issue)
+  # 1 means add 1 minute to AppDaemon time, -1 takes it away
+  clock_skew: 0
+
+  #
+  # Car charging
+  #
+  # How many cars?
+  num_cars: 1
+  car_charging_exclusive:
+    - True
+  # JT - set switch.predbat_car_charging_hold ON in HA (or its equivalent in the predbat UI config page) to remove car charging from the house load data
+  car_charging_energy:
+    - sensor.evc_charge_added
+    # might need to be the cumulative one, not sure.
+    # EVC bounces to zero quite a bit during charging. Possible need to smooth this out? See how it fares.
+  car_charging_battery_size:
+    - 58
+  car_charging_planned:
+  # A sensor that says 'we'd like to charge'
+  # Could be simply, is there something attached to the charger... or some composite of the charger mode and the car 'charger connected' sensor?
+  # The EVC seems to have nothing to say it's connected, so going with the car for now.
+    - binary_sensor.id_3_charging_cable_connected
+  car_charging_planned_reponse:
+     - 'on'
+     - 'true'
+     # ID.3 state value is on/off, although shows up in UI as 'Plugged in'/'Unplugged', include just in case
+     - 'Plugged in'
+  car_charging_limit:
+    - sensor.id_3_battery_target_charge_level
+  car_charging_soc:
+    - sensor.id_3_battery_level
+

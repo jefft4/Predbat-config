@@ -1,0 +1,204 @@
+alias: Solar modbus control
+sequence:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: input_select.solar_control_mode
+            state: Charge
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 0
+        sequence:
+          - action: select.select_option
+            metadata: {}
+            data:
+              option: Enabled Power Control
+            target:
+              entity_id: select.solax_remotecontrol_power_control
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: "5000"
+            target:
+              entity_id: number.solax_remotecontrol_active_power
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: "10000"
+            target:
+              entity_id: number.solax_remotecontrol_import_limit
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: input_select.solar_control_mode
+                state: Self-use
+                for:
+                  hours: 0
+                  minutes: 0
+                  seconds: 0
+              - condition: state
+                entity_id: input_select.solar_control_mode
+                state: Stop charge
+                for:
+                  hours: 0
+                  minutes: 0
+                  seconds: 0
+              - condition: state
+                entity_id: input_select.solar_control_mode
+                state: Stop discharge
+                for:
+                  hours: 0
+                  minutes: 0
+                  seconds: 0
+        sequence:
+          - action: select.select_option
+            metadata: {}
+            data:
+              option: Enabled Self Use
+            target:
+              entity_id: select.solax_remotecontrol_power_control
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: "5000"
+            target:
+              entity_id: number.solax_remotecontrol_active_power
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: "10000"
+            target:
+              entity_id: number.solax_remotecontrol_import_limit
+      - conditions:
+          - condition: state
+            entity_id: input_select.solar_control_mode
+            state: Discharge
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 0
+        sequence:
+          - action: select.select_option
+            metadata: {}
+            data:
+              option: Enabled Power Control
+            target:
+              entity_id: select.solax_remotecontrol_power_control
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: "-5000"
+            target:
+              entity_id: number.solax_remotecontrol_active_power
+      - conditions:
+          - condition: state
+            entity_id: input_select.solar_control_mode
+            state: Charge freeze
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 0
+        sequence:
+          - action: select.select_option
+            metadata: {}
+            data:
+              option: Enabled Power Control
+            target:
+              entity_id: select.solax_remotecontrol_power_control
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: "0"
+            target:
+              entity_id: number.solax_remotecontrol_active_power
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: "10000"
+            target:
+              entity_id: number.solax_remotecontrol_import_limit
+      - conditions:
+          - condition: state
+            entity_id: input_select.solar_control_mode
+            state: Discharge freeze
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 0
+        sequence:
+          - action: select.select_option
+            metadata: {}
+            data:
+              option: Enabled Battery Control
+            target:
+              entity_id: select.solax_remotecontrol_power_control
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: "0"
+            target:
+              entity_id: number.solax_remotecontrol_active_power
+          - action: number.set_value
+            metadata: {}
+            data:
+              value: "10000"
+            target:
+              entity_id: number.solax_remotecontrol_import_limit
+      - conditions:
+          - condition: state
+            entity_id: input_select.solar_control_mode
+            state: "OFF"
+            for:
+              hours: 0
+              minutes: 0
+              seconds: 0
+        sequence:
+          - action: select.select_option
+            metadata: {}
+            data:
+              option: Enabled Battery Control
+            target:
+              entity_id: select.solax_remotecontrol_power_control
+          - action: button.press
+            metadata: {}
+            data: {}
+            target:
+              entity_id: button.solax_system_off
+  - action: number.set_value
+    metadata: {}
+    data:
+      value: "30"
+    target:
+      entity_id: number.solax_remotecontrol_duration
+  - action: number.set_value
+    metadata: {}
+    data:
+      value: "660"
+    target:
+      entity_id: number.solax_remotecontrol_autorepeat_duration
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 2
+      milliseconds: 0
+  - action: button.press
+    metadata: {}
+    data: {}
+    target:
+      entity_id: button.solax_remotecontrol_trigger
+  - delay:
+      hours: 0
+      minutes: 0
+      seconds: 2
+      milliseconds: 0
+  - action: button.press
+    metadata: {}
+    data: {}
+    target:
+      entity_id: button.solax_remotecontrol_trigger
+description: Reads solar control mode helper, sets solax_modbus controls accordingly.
+icon: mdi:sun-wireless-outline
+mode: queued
+max: 2

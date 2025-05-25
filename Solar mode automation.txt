@@ -1,0 +1,33 @@
+alias: Solar control mode change or reassert
+description: >-
+  Periodically check mode wanted, run modbus control script. Run immediately on
+  change of mode.
+triggers:
+  - minutes: /10
+    trigger: time_pattern
+    enabled: true
+  - entity_id:
+      - input_select.solar_control_mode
+    trigger: state
+    from: null
+    to: null
+    for:
+      hours: 0
+      minutes: 0
+      seconds: 1
+conditions: []
+actions:
+  - action: notify.mobile_app_pixel_8
+    metadata: {}
+    data:
+      title: Solar system mode change
+      message: >-
+        Mode now {{ states('input_select.solar_control_mode') }} with Predbat
+        status {{ states('predbat.status') }}
+    enabled: false
+  - action: script.turn_on
+    metadata: {}
+    data: {}
+    target:
+      entity_id: script.solar_modbus_predbat_control
+mode: single
